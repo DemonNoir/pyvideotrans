@@ -55,7 +55,7 @@ class LocalLLM(BaseTrans):
         response = model.chat.completions.create(
             model=config.params.get('localllm_model',''),
             max_tokens=int(config.params.get('localllm_max_token')) if config.params.get(
-                'localllm_max_token') else 4096,
+                'localllm_max_token') else 8192,
             temperature=float(config.settings.get('aitrans_temperature',0.2)),
             frequency_penalty=0,
             messages=message
@@ -73,8 +73,13 @@ class LocalLLM(BaseTrans):
         if not response.choices[0].message.content:
             raise RuntimeError(f"[LocalLLM] {response.choices[0].finish_reason}:{response}")
         result = response.choices[0].message.content.strip()
-        match = re.search(r'<TRANSLATE_TEXT>(.*?)</TRANSLATE_TEXT>',re.sub(r'<think>(.*?)</think>', '', result,flags=re.I | re.S))
+        # Strip <think> tags first
+        result = re.sub(r'<think>(.*?)</think>', '', result, flags=re.I | re.S)
+        # Try to extract content between <TRANSLATE_TEXT> tags
+        match = re.search(r'<TRANSLATE_TEXT>(.*?)(?:</TRANSLATE_TEXT>|$)', result, flags=re.I | re.S)
         if match:
-            return match.group(1)
-        return result.strip()
+            result = match.group(1).strip()
+        # Fallback: strip any remaining raw tags
+        result = re.sub(r'</?TRANSLATE_TEXT>', '', result, flags=re.I).strip()
+        return result
 

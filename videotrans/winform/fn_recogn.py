@@ -55,6 +55,30 @@ def openwin():
 
     def opendir_fn():
         QDesktopServices.openUrl(QUrl.fromLocalFile(COPYSRT_TO_RAWDIR))
+    def open_ocr_preview():
+        recogn_type = winobj.shibie_recogn_type.currentIndex()
+        if recogn_type != recognition.PADDLE_OCR:
+            tools.show_error("Please switch recogn type to PaddleOCR first")
+            return
+        files = getattr(winobj.shibie_dropbtn, "filelist", [])
+        video_path = files[0] if files else None
+        if not video_path:
+            video_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+                winobj,
+                tr("Select a Video"),
+                config.settings.get("last_opendir", ""),
+                "Video Files (*.mp4 *.mkv *.avi *.mov *.webm)"
+            )
+            if not video_path:
+                return
+        try:
+            from videotrans.component.ocr_preview import OCRPreviewDialog
+            dlg = OCRPreviewDialog(video_path=video_path, roi=config.params.get("stt_ocr_roi"), parent=winobj)
+            if dlg.exec():
+                config.params["stt_ocr_roi"] = dlg.get_roi()
+                config.getset_params(config.params)
+        except Exception as e:
+            tools.show_error(str(e))
 
 
     def toggle_state(state):
@@ -71,6 +95,8 @@ def openwin():
         winobj.fix_punc.setDisabled(state)
         winobj.copysrt_rawvideo.setDisabled(state)
         winobj.shibie_stop.setDisabled(not state)
+        if hasattr(winobj, "ocr_preview_btn"):
+            winobj.ocr_preview_btn.setDisabled(state)
 
 
     def shibie_start_fun():
@@ -113,7 +139,8 @@ def openwin():
                 from videotrans.winform import deepseek
                 deepseek.openwin()
                 return
-        enable_diariz_is=winobj.enable_diariz.isChecked()
+        is_ocr_mode = recogn_type == recognition.PADDLE_OCR
+        enable_diariz_is=winobj.enable_diariz.isChecked() and not is_ocr_mode
 
         toggle_state(True)
         winobj.shibie_startbtn.setText(tr("running"))
@@ -128,9 +155,9 @@ def openwin():
             winobj.loglabel.setText('')
             video_list = [tools.format_video(it, None) for it in files]
             uuid_list = [obj['uuid'] for obj in video_list]
-            remove_noise_is=winobj.remove_noise.isChecked()
+            remove_noise_is=winobj.remove_noise.isChecked() and not is_ocr_mode
             fix_punc=winobj.fix_punc.isChecked()
-            nums_diariz=winobj.nums_diariz.currentIndex()
+            nums_diariz=0 if is_ocr_mode else winobj.nums_diariz.currentIndex()
             for it in video_list:
                 uuid_list.append(it['uuid'])
                 cfg={
@@ -161,7 +188,7 @@ def openwin():
             config.params["stt_copysrt_rawvideo"] = winobj.copysrt_rawvideo.isChecked()
             config.params["stt_enable_diariz"] = enable_diariz_is
             config.params["stt_nums_diariz"] = nums_diariz
-            config.params["stt_spk_insert"] = winobj.spk_insert.isChecked()
+            config.params["stt_spk_insert"] = winobj.spk_insert.isChecked() and not is_ocr_mode
             config.params["stt_rephrase"] = stt_rephrase
             config.params["stt_fix_punc"] = fix_punc
             config.params["stt_cuda"] = is_cuda
@@ -246,6 +273,18 @@ def openwin():
         if recogn_type not in [recognition.FASTER_WHISPER,recognition.OPENAI_WHISPER]:  # openai-whisper
             tools.hide_show_element(winobj.hfaster_layout, False)
 
+        is_ocr_mode = recogn_type == recognition.PADDLE_OCR
+        # 一次任务只能选 STT 或 OCR，OCR 模式下禁用语音特有选项
+        winobj.remove_noise.setDisabled(is_ocr_mode)
+        winobj.enable_diariz.setDisabled(is_ocr_mode)
+        winobj.nums_diariz.setDisabled(is_ocr_mode)
+        winobj.spk_insert.setDisabled(is_ocr_mode)
+        if is_ocr_mode:
+            winobj.remove_noise.setChecked(False)
+            winobj.enable_diariz.setChecked(False)
+            winobj.nums_diariz.setCurrentIndex(0)
+            winobj.spk_insert.setChecked(False)
+
         if recogn_type not in [recognition.FASTER_WHISPER,
                                recognition.Faster_Whisper_XXL,
                                recognition.Whisper_CPP,
@@ -326,6 +365,10 @@ def openwin():
         winobj.shibie_label.clicked.connect(click_reglabel)
 
         winobj.shibie_startbtn.clicked.connect(shibie_start_fun)
+        winobj.ocr_preview_btn = QtWidgets.QPushButton("OCR Preview")
+        winobj.ocr_preview_btn.setCursor(Qt.PointingHandCursor)
+        winobj.ocr_preview_btn.clicked.connect(open_ocr_preview)
+        winobj.h4.insertWidget(1, winobj.ocr_preview_btn)
         winobj.shibie_stop.clicked.connect(stop_recogn)
         winobj.shibie_opendir.clicked.connect(opendir_fn)
         winobj.is_cuda.setChecked(config.params.get("stt_cuda",False))
@@ -379,6 +422,8 @@ def openwin():
 
         winobj.loglabel.clicked.connect(show_detail_error)
         winobj.shibie_model.currentIndexChanged.connect(model_type_change)
+        recogn_type_change()
 
 
     QTimer.singleShot(10,_bind)
+

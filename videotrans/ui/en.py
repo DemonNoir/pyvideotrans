@@ -142,6 +142,12 @@ class Ui_MainWindow(object):
         self.recogn2pass = QtWidgets.QCheckBox()
         self.recogn2pass.setToolTip(tr("Secondary speech recognition of dubbing files"))
         self.recogn2pass.setText(tr("STT again"))
+        self.ocr_preview_btn = QtWidgets.QPushButton(self.layoutWidget)
+        self.ocr_preview_btn.setMinimumSize(QtCore.QSize(110, 30))
+        self.ocr_preview_btn.setObjectName("ocr_preview_btn")
+        self.ocr_preview_btn.setText("OCR Preview")
+        self.ocr_preview_btn.setToolTip(tr("Open OCR preview and crop subtitle area"))
+        self.ocr_preview_btn.setCursor(Qt.PointingHandCursor)
 
         
 
@@ -153,6 +159,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_4.addWidget(self.rephrase)
         self.horizontalLayout_4.addWidget(self.remove_noise)
         self.horizontalLayout_4.addWidget(self.recogn2pass)
+        self.horizontalLayout_4.addWidget(self.ocr_preview_btn)
         self.horizontalLayout_4.addStretch()
 
         self.verticalLayout_3.addLayout(self.horizontalLayout_4)

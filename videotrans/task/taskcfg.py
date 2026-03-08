@@ -59,6 +59,8 @@ class TaskCfg:
     voice_autorate:bool=False #是否音频自动加速
     video_autorate:bool=False #是否视频自动慢速
     cuda:bool=False#是否使用cuda加速
+    # 与新代码兼容：部分流程使用 is_cuda 字段
+    is_cuda: bool = None
 
     name:str=None # 规范化处理的原始文件绝对路径 D:/XXX/1.MP4
     basename:str=None # noextname + ext 名 1.mp4
@@ -80,3 +82,10 @@ class TaskCfg:
     fix_punc:bool=False
     # 对配音音频再次识别
     recogn2pass:bool=False
+
+    def __post_init__(self):
+        # 兼容旧字段 cuda 与新字段 is_cuda，保证两者一致
+        if self.is_cuda is None:
+            self.is_cuda = self.cuda
+        else:
+            self.cuda = self.is_cuda

@@ -8,4 +8,4 @@ if torch.cuda.is_available():
     print(f"\ncuDNN 是否可用: {'是 Yes' if torch.backends.cudnn.is_available() else '否 No'}")
     print(f"\ncuDNN 版本号: {torch.backends.cudnn.version()}\n\n")
     
-os.system('pause')    
+# os.system('pause')

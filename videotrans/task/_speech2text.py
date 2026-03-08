@@ -9,7 +9,7 @@ from typing import List, Dict
 from videotrans import recognition
 from videotrans.configure import config
 from videotrans.configure.config import tr
-from videotrans.recognition import run, Faster_Whisper_XXL, Whisper_CPP
+from videotrans.recognition import run, Faster_Whisper_XXL, Whisper_CPP, PADDLE_OCR
 from videotrans.task._base import BaseTask
 
 from videotrans.util import tools
@@ -36,6 +36,12 @@ class SpeechToText(BaseTask):
         self.max_speakers=self.cfg.nums_diariz if self.cfg.enable_diariz else -1
         if self.max_speakers>0:
             self.max_speakers+=1
+        if self.cfg.recogn_type == PADDLE_OCR:
+            # 一次任务只能是 STT 或 OCR 其一，OCR 模式禁用语音特有能力
+            self.cfg.remove_noise = False
+            self.cfg.enable_diariz = False
+            self.cfg.nums_diariz = 0
+            self.max_speakers = -1
         # 存放目标文件夹
         if not self.cfg.target_dir:
             self.cfg.target_dir = config.HOME_DIR + f"/recogn"
@@ -53,18 +59,23 @@ class SpeechToText(BaseTask):
     def prepare(self):
         if self._exit():
             return
+        if self.cfg.recogn_type == PADDLE_OCR:
+            return
         tools.conver_to_16k(self.cfg.name, self.cfg.shibie_audio)
 
     def recogn(self):
         if self._exit(): return
-        while 1:
-            # 尚未生成
-            if Path(self.cfg.shibie_audio).exists():
-                break
-            time.sleep(0.5)
+        if self.cfg.recogn_type == PADDLE_OCR:
+            self.cfg.shibie_audio = self.cfg.name
+        else:
+            while 1:
+                # 尚未生成
+                if Path(self.cfg.shibie_audio).exists():
+                    break
+                time.sleep(0.5)
         try:
             # 需要降噪
-            if self.cfg.remove_noise:
+            if self.cfg.remove_noise and self.cfg.recogn_type != PADDLE_OCR:
                 tools.check_and_down_ms(model_id='iic/speech_frcrn_ans_cirm_16k',callback=self._process_callback)
                 title=tr("Starting to process speech noise reduction, which may take a long time, please be patient")
                 from videotrans.process.prepare_audio import remove_noise
@@ -72,7 +83,7 @@ class SpeechToText(BaseTask):
                     "input_file":self.cfg.shibie_audio,
                     "output_file":f"{self.cfg.cache_folder}/removed_noise_{time.time()}.wav",
                     "TEMP_DIR":config.TEMP_DIR,
-                    "is_cuda":self.cfg.cuda
+                    "is_cuda":self.cfg.is_cuda
                 }
                 # 静默失败，不处理
                 try:
@@ -157,10 +168,10 @@ class SpeechToText(BaseTask):
                     recogn_type=self.cfg.recogn_type,
                     uuid=self.uuid,
                     model_name=self.cfg.model_name,
-                    audio_file=self.cfg.shibie_audio,
+                    audio_file=self.cfg.name if self.cfg.recogn_type == PADDLE_OCR else self.cfg.shibie_audio,
                     detect_language=self.cfg.detect_language,
                     cache_folder=self.cfg.cache_folder,
-                    is_cuda=self.cfg.cuda,
+                    is_cuda=self.cfg.is_cuda,
                     subtitle_type=0,
                     max_speakers=self.max_speakers,
                     llm_post=self.cfg.rephrase == 1
@@ -178,7 +189,7 @@ class SpeechToText(BaseTask):
                 tools.check_and_down_ms(model_id='iic/punc_ct-transformer_cn-en-common-vocab471067-large',callback=self._process_callback)
                 text_dict={f'{it["line"]}':re.sub(r'[,.?!，。？！]',' ',it["text"]) for it in self.source_srt_list}
                 from videotrans.process.prepare_audio import fix_punc
-                kw={"text_dict":text_dict,"TEMP_DIR":config.TEMP_DIR,"is_cuda":self.cfg.cuda}
+                kw={"text_dict":text_dict,"TEMP_DIR":config.TEMP_DIR,"is_cuda":self.cfg.is_cuda}
                 try:
                     _rs=self._new_process(callback=fix_punc,title=tr("Restoring punct"),kwargs=kw)
                     if _rs:
@@ -251,7 +262,7 @@ class SpeechToText(BaseTask):
                 "subtitles":[ [it['start_time'],it['end_time']] for it in self.source_srt_list],
                 "num_speakers":self.max_speakers,
                 "TEMP_DIR":config.TEMP_DIR,
-                "is_cuda":self.cfg.cuda
+                "is_cuda":self.cfg.is_cuda
         }
         if speaker_type=='built':
             from videotrans.process.prepare_audio import built_speakers as _run_speakers
@@ -269,7 +280,7 @@ class SpeechToText(BaseTask):
             config.logger.error(f'当前所选说话人分离模型不支持:{speaker_type=}')
             return
         try:
-            spk_list=self._new_process(callback=_run_speakers,title=title,is_cuda=self.cfg.cuda and speaker_type!='built',kwargs=kw)
+            spk_list=self._new_process(callback=_run_speakers,title=title,is_cuda=self.cfg.is_cuda and speaker_type!='built',kwargs=kw)
             if spk_list:
                 Path(self.cfg.cache_folder+"/speaker.json").write_text(json.dumps(spk_list),encoding='utf-8')
         except:
@@ -326,3 +337,4 @@ class SpeechToText(BaseTask):
             self.hasend = True
             return True
         return False
+

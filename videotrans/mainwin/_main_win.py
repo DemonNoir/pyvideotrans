@@ -485,6 +485,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.model_name.setDisabled(True)
         else:
             self.model_name.setDisabled(False)
+        self.ocr_preview_btn.setEnabled(recogn_type == recognition.PADDLE_OCR)
 
         if recogn_type > 1:
             self.model_name_help.setVisible(False)
@@ -509,6 +510,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_save_dir.clicked.connect(self.win_action.get_save_dir)
         self.set_adv_status.clicked.connect(self.win_action.toggle_adv)
         self.btn_get_video.clicked.connect(self.win_action.get_mp4)
+        self.ocr_preview_btn.clicked.connect(self.win_action.open_ocr_preview)
         self.listen_btn.clicked.connect(self.win_action.listen_voice_fun)
         self.recogn_type.currentIndexChanged.connect(self.win_action.recogn_type_change)
         self.model_name.currentIndexChanged.connect(self.win_action.model_type_change)

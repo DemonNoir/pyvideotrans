@@ -98,6 +98,8 @@ class WinAction(WinActionSub):
     # 语音识别方式改变时
     def recogn_type_change(self):
         recogn_type = self.main.recogn_type.currentIndex()
+        # OCR preview is only meaningful in PaddleOCR mode.
+        self.main.ocr_preview_btn.setEnabled(recogn_type == recognition.PADDLE_OCR)
         if recogn_type == recognition.Faster_Whisper_XXL and not self.show_xxl_select():
             return
         if recogn_type == recognition.Whisper_CPP and not self.show_cpp_select():
@@ -146,6 +148,29 @@ class WinAction(WinActionSub):
             self.main.show_tips.setText(is_allow_lang)
         else:
             self.main.show_tips.setText('')
+
+    def open_ocr_preview(self):
+        recogn_type = self.main.recogn_type.currentIndex()
+        if recogn_type != recognition.PADDLE_OCR:
+            tools.show_error("Please switch ASR channel to PaddleOCR first")
+            return
+        video_path = self.queue_mp4[0] if self.queue_mp4 else None
+        if not video_path:
+            video_path, _ = QFileDialog.getOpenFileName(
+                self.main,
+                tr("Select a Video"),
+                config.params.get('last_opendir', ''),
+                "Video Files (*.mp4 *.mkv *.avi *.mov *.webm)")
+            if not video_path:
+                return
+        try:
+            from videotrans.component.ocr_preview import OCRPreviewDialog
+            dlg = OCRPreviewDialog(video_path=video_path, roi=config.params.get("stt_ocr_roi"), parent=self.main)
+            if dlg.exec():
+                config.params["stt_ocr_roi"] = dlg.get_roi()
+                config.getset_params(config.params)
+        except Exception as e:
+            tools.show_error(str(e))
 
     # 是否属于 配音角色 随所选目标语言变化的配音渠道 是 edgeTTS AzureTTS 或 302.ai同时 ai302tts_model=azure
     def change_by_lang(self, type):

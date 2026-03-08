@@ -280,10 +280,10 @@ class TransCreate(BaseTask):
                 "input_file":self.cfg.source_wav,
                 "output_file":f"{self.cfg.cache_folder}/remove_noise.wav",
                 "TEMP_DIR":self.cfg.cache_folder,
-                "is_cuda":self.cfg.cuda
+                "is_cuda":self.cfg.is_cuda
             }
             try:
-                _rs = self._new_process(callback=remove_noise,title=title,is_cuda=self.cfg.cuda,kwargs=kw)
+                _rs = self._new_process(callback=remove_noise,title=title,is_cuda=self.cfg.is_cuda,kwargs=kw)
                 if _rs:
                     self.cfg.source_wav=_rs
                 self._signal(text='remove noise end')
@@ -362,7 +362,7 @@ class TransCreate(BaseTask):
                 audio_file=self.cfg.source_wav,
                 detect_language=self.cfg.detect_language,
                 cache_folder=self.cfg.cache_folder,
-                is_cuda=self.cfg.cuda,
+                is_cuda=self.cfg.is_cuda,
                 subtitle_type=self.cfg.subtitle_type,
                 max_speakers=self.max_speakers,
                 llm_post=self.cfg.rephrase == 1
@@ -379,9 +379,9 @@ class TransCreate(BaseTask):
             from videotrans.process.prepare_audio import fix_punc
             # 预先删掉已有的标点
             text_dict={f'{it["line"]}':re.sub(r'[,.?!，。？！]',' ',it["text"]) for it in self.source_srt_list}
-            kw={"text_dict":text_dict,"TEMP_DIR":self.cfg.cache_folder,"is_cuda":self.cfg.cuda}
+            kw={"text_dict":text_dict,"TEMP_DIR":self.cfg.cache_folder,"is_cuda":self.cfg.is_cuda}
             try:
-                _rs=self._new_process(callback=fix_punc,title=tr("Restoring punct"),is_cuda=self.cfg.cuda,kwargs=kw)
+                _rs=self._new_process(callback=fix_punc,title=tr("Restoring punct"),is_cuda=self.cfg.is_cuda,kwargs=kw)
                 if _rs:
                     for it in self.source_srt_list:
                         it['text']=_rs.get(f'{it["line"]}',it['text'])
@@ -536,7 +536,7 @@ class TransCreate(BaseTask):
                 audio_file=shibie_audio,
                 detect_language=detect_language,
                 cache_folder=self.cfg.cache_folder,
-                is_cuda=self.cfg.cuda,
+                is_cuda=self.cfg.is_cuda,
                 recogn2pass=True#二次识别
             )
             if self._exit(): return
@@ -584,7 +584,7 @@ class TransCreate(BaseTask):
                     "subtitles":[ [it['start_time'],it['end_time']] for it in self.source_srt_list],
                     "num_speakers":self.max_speakers,
                     "TEMP_DIR":self.cfg.cache_folder,
-                    "is_cuda":self.cfg.cuda
+                    "is_cuda":self.cfg.is_cuda
             }
             if speaker_type=='built':
                 from videotrans.process.prepare_audio import built_speakers as _run_speakers
@@ -601,7 +601,7 @@ class TransCreate(BaseTask):
             else:
                 config.logger.error(f'当前所选说话人分离模型不支持:{speaker_type=}')
                 return
-            spk_list=self._new_process(callback=_run_speakers,title=title,is_cuda=self.cfg.cuda and speaker_type!='built',kwargs=kw)
+            spk_list=self._new_process(callback=_run_speakers,title=title,is_cuda=self.cfg.is_cuda and speaker_type!='built',kwargs=kw)
 
             if spk_list:
                 Path(self.cfg.cache_folder+"/speaker.json").write_text(json.dumps(spk_list),encoding='utf-8')
